@@ -119,86 +119,104 @@ public class Mod implements IXposedHookZygoteInit, IXposedHookLoadPackage, IXpos
 		});
 		
 		XposedHelpers.findAndHookMethod(ClockWidget, "onFinishInflate", new XC_MethodHook() {
-			@Override
+            long firstTapTime = 0;
+            int tapCount = 0;
+
+            @Override
 			protected void afterHookedMethod(MethodHookParam param) {
 				mClockView = (LinearLayout) getObjectField(param.thisObject, "mClockView");
 				mClockView.setOnTouchListener(new OnTouchListener() {
-					
-					@Override
-					public boolean onTouch(View v, MotionEvent event) {
-				        switch(event.getAction()) {
-			            // Capture the position where swipe begins
-			            case MotionEvent.ACTION_DOWN: {
-			                event.getPointerCoords(0, mDownPos);
-			                return true;
-			            }
-			 
-			            // Get the position where swipe ends
-			            case MotionEvent.ACTION_UP: {
-			                event.getPointerCoords(0, mUpPos);
-			 
-			                float dx = mDownPos.x - mUpPos.x;
-			 
-			                // Check for horizontal wipe
-			                if (Math.abs(dx) > MIN_DISTANCE) {
-			                    if (dx > 0)
-			                        onSwipeLeft();
-			                    else
-			                        onSwipeRight();
-			                    return true;
-			                }
-			 
-			                float dy = mDownPos.y - mUpPos.y;
-			 
-			                // Check for vertical wipe
-			                if (Math.abs(dy) > MIN_DISTANCE) {
-			                    if (dy > 0)
-			                        onSwipeUp();
-			                    else
-			                        onSwipeDown();
-			                    return true;
-			                }
-			            }
-			        }
-			        return false;
-					}
+                    @Override
+                    public boolean onTouch(View v, MotionEvent event) {
+                        switch (event.getAction()) {
+                            // Capture the position where swipe begins
+                            case MotionEvent.ACTION_DOWN: {
+                                event.getPointerCoords(0, mDownPos);
+                                if (tapCount == 0) {
+                                    firstTapTime = System.currentTimeMillis();
+                                }
 
-					private void onSwipeDown() {
+                                tapCount++;
+
+                                return true;
+                            }
+
+                            // Get the position where swipe ends
+                            case MotionEvent.ACTION_UP: {
+                                event.getPointerCoords(0, mUpPos);
+
+                                if (tapCount == 2 && System.currentTimeMillis() - firstTapTime <= 800) {
+                                    onDoubleTap();
+                                    tapCount = 0;
+                                    return true;
+                                }
+
+                                if (System.currentTimeMillis() - firstTapTime > 800) {
+                                    firstTapTime = 0;
+                                    tapCount = 0;
+                                }
+
+                                float dx = mDownPos.x - mUpPos.x;
+
+                                // Check for horizontal wipe
+                                if (Math.abs(dx) > MIN_DISTANCE) {
+                                    if (dx > 0)
+                                        onSwipeLeft();
+                                    else
+                                        onSwipeRight();
+                                    return true;
+                                }
+
+                                float dy = mDownPos.y - mUpPos.y;
+
+                                // Check for vertical wipe
+                                if (Math.abs(dy) > MIN_DISTANCE) {
+                                    if (dy > 0)
+                                        onSwipeUp();
+                                    else
+                                        onSwipeDown();
+                                    return true;
+                                }
+                            }
+                        }
+
+                        return false;
+                    }
+
+                    private void onDoubleTap() {
+                        XposedBridge.log("[" + TAG + "] onDoubleTap");
                         if (mContext != null) {
                             String command = "togglepause";
                             Intent i = new Intent("com.android.music.musicservicecommand");
                             i.putExtra("command", command);
                             mContext.sendBroadcast(i);
                         }
-					}
+                    }
 
-					private void onSwipeUp() {
+                    private void onSwipeDown() {
+                    }
+
+                    private void onSwipeUp() {
+                    }
+
+                    private void onSwipeRight() {
                         if (mContext != null) {
-                            String command = "togglepause";
-                            Intent i = new Intent("com.android.music.musicservicecommand");
-                            i.putExtra("command", command);
-                            mContext.sendBroadcast(i);
-                        }
-					}
-
-					private void onSwipeRight() {
-						if (mContext != null) {
                             String command = "next";
                             Intent i = new Intent("com.android.music.musicservicecommand");
                             i.putExtra("command", command);
                             mContext.sendBroadcast(i);
-						}
-					}
+                        }
+                    }
 
-					private void onSwipeLeft() {
-						if (mContext != null) {
+                    private void onSwipeLeft() {
+                        if (mContext != null) {
                             String command = "previous";
                             Intent i = new Intent("com.android.music.musicservicecommand");
                             i.putExtra("command", command);
                             mContext.sendBroadcast(i);
-						}
-					}
-				});
+                        }
+                    }
+                });
 			}
 		});
 	}
